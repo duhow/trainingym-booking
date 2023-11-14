@@ -121,6 +121,9 @@ class Trainingym:
     def activityCancel(self, activity_id: int):
         return self._virtual_activity(activity_id, "cancelBook")
 
+    # this is processed in background by the server
+    # returns response on Websocket (currently not implemented)
+    # returns empty list [] if request was accepted?
     def _virtual_activity(self, activity_id: int, action: str):
         url = f"/api/usuarios/reservas/{action}/{activity_id}"
         body = {"connectionClientId":""}
