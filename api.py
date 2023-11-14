@@ -2,6 +2,7 @@ import requests
 import json
 from datetime import datetime, timedelta
 from enum import Enum
+from functools import lru_cache
 
 class Dias(Enum):
     lunes = 0
@@ -73,13 +74,16 @@ class Trainingym:
             return hour_parsed
         return date.replace(hour=hour_parsed.hour, minute=hour_parsed.minute)
 
+    @lru_cache
     def myBookings(self):
         # aaData[], new to old, 100 entries
         return self.query_user("/api/usuarios/reservas/myBookings?noCache=0", referer="actividades")
 
+    @lru_cache
     def getActivityGroups(self, lang: int = 6):
         return self.query_user("/api/usuarios/reservas/getActivityGroups?idLanguage={lang}&noCache=0", referer="actividades")
 
+    @lru_cache
     def getSchedulesApp(self, start_date: str = None):
         end_days = 5
         if start_date is not None:
@@ -116,10 +120,61 @@ class Trainingym:
         activities.sort(key=lambda x: x["date"])
         return activities
 
-    def get_possible_activites(self, parsed_activities: dict):
+    def book_activities(self, parsed_activities: dict):
         """ Send the list of days->activites, and process if can do """
-        pass
+        booked_activities = self.next_activities()
 
+        for gym_day in self.getSchedulesApp().get("calendar"):
+            dow = self.parse_date(gym_day["dateProgram"]).weekday()
+            # si no haces clase ese día de la semana
+            if dow not in parsed_activities.keys():
+                continue
+
+            time_start_since = parsed_activities[dow].get("start_time")
+            wanted_activities = parsed_activities[dow].get("clases")
+            for activity in gym_day.get("schedules"):
+                time_start = self.parse_hour(activity["timeStart"]).time()
+                if time_start < time_start_since:
+                    continue
+                name = activity["activity"].get("name")
+                if not self.check_name(name, wanted_activities):
+                    continue
+
+                msg = f"Found {name} on {dow}@{time_start}"
+
+                if activity["id"] in [x["id"] for x in self.next_activities()]:
+                    msg += " (already booked)"
+                    print(msg)
+                    continue
+
+                places = activity.get("capacityAssistant", 0) - activity["bookingInfo"].get("bookedPlaces"), 0)
+                if places == 0:
+                    msg += " (no places available)"
+                    print(msg)
+                    continue
+
+                print(msg)
+
+    def check_name(self, name: str, search_in: list) -> bool:
+        """ Perform name variants to check if name is inside """
+
+        name = name.lower()
+        names = [x.lower() for x in search_in]
+
+        if name in names:
+            return True
+        if name.replace(" ", "") in names:
+            return True
+        if name in [x.replace(" ", "") for x in names]:
+            return True
+
+        return False
+
+
+    def cache_clear(self):
+        for name, method in vars(self).items():
+            if callable(method) and hasattr(method, 'cache_clear'):
+                method.cache_clear()
 
 
 # https://www.trainingymapp.com/webtouch/api/viewss/menu/usuario

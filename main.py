@@ -43,12 +43,11 @@ def main():
     trainingym.login(args.email, args.password)
     print(f"Welcome {trainingym.person_fullname} !")
 
-    print("Next activities:")
+    #print("Next activities:")
     #print_activities(trainingym.next_activities())
 
-    today = datetime.today()
-    activities = load_yaml()
-    print(trainingym.getSchedulesApp())
+    want_list = load_yaml()
+    trainingym.book_activities(want_list)
 
 if __name__ == "__main__":
     main()
