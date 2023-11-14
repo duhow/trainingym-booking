@@ -3,6 +3,7 @@ import json
 from datetime import datetime, timedelta
 from enum import Enum
 from functools import lru_cache
+from random import random as random_decimal
 
 class Dias(Enum):
     lunes = 0
@@ -12,6 +13,15 @@ class Dias(Enum):
     viernes = 4
     sabado = 5
     domingo = 6
+
+class BookingState(Enum):
+    NOT_OPEN = 0 # sin mensaje
+    AVAILABLE = 1 # boton para Reserva ya
+    ONLINE_BOOKING_UNAVAILABLE = 2 # boton Sin plaza online
+    BOOKED = 3 # boton para Cancelar reserva
+    NOT_AVAILABLE = 5 # boton No Disponible
+    FINISHED = 6 # se acabo la clase
+    FULL = 7 # boton Completa
 
 class Trainingym:
     base_url = "https://www.trainingymapp.com/webtouch/"
@@ -55,11 +65,18 @@ class Trainingym:
 
         return req
 
-    def query_user(self, path, referer):
+    def query_user(self, path, referer: str, nocache: bool = True):
         headers = {
             "Accept": "application/json, text/plain, */*",
-            "Referer": f"{self.base_url}/{referer}"
         }
+        if referer:
+            headers["Referer"] = f"{self.base_url}/{referer}"
+        if nocache:
+            arg = f"noCache={random_decimal()}"
+            if "?" in path:
+                path += f"&{arg}"
+            else:
+                path += f"?{arg}"
         req = self.query(path, headers=headers)
         req.raise_for_status()
 
@@ -77,11 +94,11 @@ class Trainingym:
     @lru_cache
     def myBookings(self):
         # aaData[], new to old, 100 entries
-        return self.query_user("/api/usuarios/reservas/myBookings?noCache=0", referer="actividades")
+        return self.query_user("/api/usuarios/reservas/myBookings", referer="actividades")
 
     @lru_cache
     def getActivityGroups(self, lang: int = 6):
-        return self.query_user("/api/usuarios/reservas/getActivityGroups?idLanguage={lang}&noCache=0", referer="actividades")
+        return self.query_user("/api/usuarios/reservas/getActivityGroups?idLanguage={lang}", referer="actividades")
 
     @lru_cache
     def getSchedulesApp(self, start_date: str = None):
@@ -94,9 +111,20 @@ class Trainingym:
         start_date = str(today)
         end_date = str(today + timedelta(days=end_days))
 
-        url = f"/api/usuarios/reservas/getSchedulesApp/?startDateTime={start_date}&endDateTime={end_date}&noCache=0"
+        url = f"/api/usuarios/reservas/getSchedulesApp/?startDateTime={start_date}&endDateTime={end_date}"
         # calendar[*] dateProgram,schedules[*]
         return self.query_user(url, referer="actividades")
+
+    def activityBook(self, activity_id: int):
+        return self._virtual_activity(activity_id, "bookTouch")
+
+    def activityCancel(self, activity_id: int):
+        return self._virtual_activity(activity_id, "cancelBook")
+
+    def _virtual_activity(self, activity_id: int, action: str):
+        url = f"/api/usuarios/reservas/{action}/{activity_id}"
+        body = {"connectionClientId":""}
+        return self.query(url, method="POST", json=body)
 
     def next_activities(self):
         """ Return a list of upcoming activities. Include completed today """
@@ -125,7 +153,8 @@ class Trainingym:
         booked_activities = self.next_activities()
 
         for gym_day in self.getSchedulesApp().get("calendar"):
-            dow = self.parse_date(gym_day["dateProgram"]).weekday()
+            day_schedule = self.parse_date(gym_day["dateProgram"])
+            dow = day_schedule.weekday()
             # si no haces clase ese día de la semana
             if dow not in parsed_activities.keys():
                 continue
@@ -140,20 +169,38 @@ class Trainingym:
                 if not self.check_name(name, wanted_activities):
                     continue
 
-                msg = f"Found {name} on {dow}@{time_start}"
+                date_str = day_schedule.strftime("%a") + " " + time_start.strftime("%H:%M")
+                booking_state = activity.get("bookingState")
+                msg = f"Found {name} on {date_str}"
 
-                if activity["id"] in [x["id"] for x in self.next_activities()]:
+                if (
+                    booking_state == BookingState.BOOKED or
+                    activity["id"] in [x["id"] for x in self.next_activities()]
+                ):
                     msg += " (already booked)"
                     print(msg)
                     continue
 
-                places = activity.get("capacityAssistant", 0) - activity["bookingInfo"].get("bookedPlaces"), 0)
-                if places == 0:
+                places = activity.get("capacityAssistant", 0) - activity["bookingInfo"].get("bookedPlaces", 0)
+                if booking_state == BookingState.FULL or places <= 0:
                     msg += " (no places available)"
                     print(msg)
                     continue
 
+                if (
+                    booking_state != BookingState.AVAILABLE or
+                    not activity["bookingInfo"].get("isReservable")
+                ):
+                    msg += " (not reservable)"
+                    print(msg)
+                    continue
+
+                msg += f' {activity["id"]}'
                 print(msg)
+
+                # TODO: Trainingym does not allow booking two simultaneous classes (two sessions within same schedule)
+                print(f"> Booking activity ({places} left)")
+                self.activityBook(activity["id"])
 
     def check_name(self, name: str, search_in: list) -> bool:
         """ Perform name variants to check if name is inside """
@@ -169,7 +216,6 @@ class Trainingym:
             return True
 
         return False
-
 
     def cache_clear(self):
         for name, method in vars(self).items():

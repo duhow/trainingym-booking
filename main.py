@@ -5,6 +5,7 @@ from api import Trainingym, Dias
 import logging
 import yaml
 from datetime import datetime
+from time import sleep
 
 #logging.basicConfig()
 #logging.getLogger().setLevel(logging.DEBUG)
@@ -43,8 +44,8 @@ def main():
     trainingym.login(args.email, args.password)
     print(f"Welcome {trainingym.person_fullname} !")
 
-    #print("Next activities:")
-    #print_activities(trainingym.next_activities())
+    print("Next activities:")
+    print_activities(trainingym.next_activities())
 
     want_list = load_yaml()
     trainingym.book_activities(want_list)
