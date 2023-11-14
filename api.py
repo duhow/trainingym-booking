@@ -1,8 +1,9 @@
 import requests
 import json
 from datetime import datetime, timedelta
+from enum import Enum
 
-class Dias:
+class Dias(Enum):
     lunes = 0
     martes = 1
     miercoles = 2
@@ -112,7 +113,12 @@ class Trainingym:
                 }
                 activities.append(activity)
 
+        activities.sort(key=lambda x: x["date"])
         return activities
+
+    def get_possible_activites(self, parsed_activities: dict):
+        """ Send the list of days->activites, and process if can do """
+        pass
 
 
 
