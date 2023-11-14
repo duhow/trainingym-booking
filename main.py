@@ -32,13 +32,37 @@ def load_yaml(filepath: str = "clases.yaml"):
                 activities[dia.value]["start_time"] = datetime.strptime(data[dia.name].get("desde"), "%I%p").time()
     return activities
 
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Login to Trainingym app")
+    parser.add_argument("email", nargs="?", default=None, help="Email address to use for login")
+    parser.add_argument("password", nargs="?", default=None, help="Password to use for login")
+    parser.add_argument("-c", "--config", default="config.yaml", help="Path to config file")
+
+    return parser.parse_args()
+
+def load_credentials_from_config(filepath):
+    try:
+        with open(filepath, "r") as config_file:
+            config_data = yaml.safe_load(config_file)
+            if config_data is not None:
+                return config_data.get("email"), config_data.get("password")
+            else:
+                raise ValueError("Invalid YAML data in config.yaml")
+    except FileNotFoundError:
+        raise FileNotFoundError("config.yaml not found")
+    except Exception as e:
+        raise ValueError(f"Error loading values from config.yaml: {e}")
 
 def main():
-    parser = argparse.ArgumentParser(description="Login to Trainingym app")
-    parser.add_argument("email", help="Email address to use for login")
-    parser.add_argument("password", help="Password to use for login")
+    args = parse_arguments()
 
-    args = parser.parse_args()
+    if args.email is None or args.password is None:
+        email, password = load_credentials_from_config(args.config)
+        args.email = args.email or email
+        args.password = args.password or password
+
+    if args.email is None or args.password is None:
+        raise ValueError("Missing email or password")
 
     trainingym = Trainingym()
     trainingym.login(args.email, args.password)
