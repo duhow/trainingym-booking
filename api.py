@@ -101,8 +101,7 @@ class Trainingym:
         return self.query_user("/api/usuarios/reservas/getActivityGroups?idLanguage={lang}", referer="actividades")
 
     @lru_cache
-    def getSchedulesApp(self, start_date: str = None):
-        end_days = 5
+    def getSchedulesApp(self, start_date: str = None, end_days: int = 4):
         if start_date is not None:
             raise NotImplementedError("Setting a start date is not implemented yet")
 
