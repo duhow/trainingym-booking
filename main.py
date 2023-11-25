@@ -6,6 +6,7 @@ import logging
 import yaml
 from datetime import datetime
 from time import sleep
+import json
 
 #logging.basicConfig()
 #logging.getLogger().setLevel(logging.DEBUG)
@@ -72,6 +73,8 @@ def main():
     print_activities(trainingym.next_activities())
 
     want_list = load_yaml()
+    #print(json.dumps(trainingym.getSchedulesApp()))
+    #return
     trainingym.book_activities(want_list)
 
 if __name__ == "__main__":

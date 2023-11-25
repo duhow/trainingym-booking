@@ -190,10 +190,12 @@ class Trainingym:
                     print(msg)
                     continue
 
-                if (
-                    booking_state != BookingState.AVAILABLE or
-                    not activity["bookingInfo"].get("isReservable")
-                ):
+                if booking_state == BookingState.NOT_AVAILABLE:
+                    msg += " (not available)"
+                    print(msg)
+                    continue
+
+                if not activity["bookingInfo"].get("isReservable"):
                     msg += " (not reservable)"
                     print(msg)
                     continue
