@@ -172,6 +172,10 @@ class Trainingym:
                 if not self.check_name(name, wanted_activities):
                     continue
 
+                day_activity = datetime.combine(day_schedule, time_start)
+                if datetime.now() >= day_activity:
+                    continue
+
                 date_str = day_schedule.strftime("%a") + " " + time_start.strftime("%H:%M")
                 booking_state = activity.get("bookingState")
                 msg = f"Found {name} on {date_str}"
@@ -181,7 +185,7 @@ class Trainingym:
                     activity["id"] in [x["id"] for x in self.next_activities()]
                 ):
                     msg += " (already booked)"
-                    print(msg)
+                    #print(msg)
                     continue
 
                 places = activity.get("capacityAssistant", 0) - activity["bookingInfo"].get("bookedPlaces", 0)
